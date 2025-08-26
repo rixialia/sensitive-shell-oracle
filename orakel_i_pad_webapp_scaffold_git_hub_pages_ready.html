@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Oracle – iPad Portrait</title>
+    <style>
+      /* --- Base / Reset --- */
+      *, *::before, *::after { box-sizing: border-box; }
+      html, body { height: 100%; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        background: #0a0b10;
+        color: #f5f7fa;
+        touch-action: manipulation;
+        -webkit-user-select: none; user-select: none;
+        overflow: hidden;
+      }
+
+      /* Utility */
+      .hidden { display: none !important; }
+      .screen { position: absolute; inset: 0; display: grid; place-items: center; }
+      .fade { transition: opacity 220ms ease; }
+      .transparent { opacity: 0; }
+      .elev-1 { box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+      .pill { padding: .7rem 1rem; border-radius: 999px; background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(6px); }
+      .tap { cursor: pointer; }
+
+      /* --- Orientation guard (encourages portrait) --- */
+      #orientation-guard { position: absolute; inset: 0; display: none; align-items: center; justify-content: center; background: #05060a; z-index: 10000; text-align: center; padding: 2rem; }
+      @media (orientation: landscape) { #orientation-guard { display: flex; } }
+
+      /* --- Start screen --- */
+      #start-screen { background: #000; }
+      #startVideo { position: absolute; width: 100%; height: 100%; object-fit: cover; }
+      .touch-prompt { position: relative; z-index: 2; font-size: clamp(24px, 5vw, 54px); letter-spacing: .08em; text-transform: uppercase; padding: .6rem 1.2rem; border-radius: 999px; border: 1px solid rgba(255,255,255,.3); background: rgba(0,0,0,.35); backdrop-filter: blur(6px); }
+
+      /* --- Hub screen (six shells with labels) --- */
+      #hub-screen { background: radial-gradient(120% 120% at 50% 20%, #182034 0%, #0b0e16 65%, #07090f 100%); }
+      #hub-bg { position: absolute; inset: 0; background-position: center; background-size: cover; opacity: .25; }
+      .hub-wrap { position: relative; width: min(92vw, 760px); height: min(140vw, 100vh); aspect-ratio: 3/4; }
+      .hub-center { position: absolute; inset: 0; margin: auto; width: 86%; height: 86%; }
+      .shell-label { position: absolute; width: 48%; max-width: 280px; transform: translate(-50%, -50%); text-align: center; font-size: clamp(14px, 2.9vw, 22px); line-height: 1.25; }
+      .shell-label .pill { display: inline-block; }
+      /* Approximate circular layout positions */
+      .pos-0 { left: 50%; top: 7%; }
+      .pos-1 { left: 83%; top: 23%; }
+      .pos-2 { left: 83%; top: 77%; }
+      .pos-3 { left: 50%; top: 93%; }
+      .pos-4 { left: 17%; top: 77%; }
+      .pos-5 { left: 17%; top: 23%; }
+
+      /* --- Animation screen --- */
+      #animation-screen { background: #000; }
+      #animVideo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+      #backArrow { position: absolute; top: 16px; left: 16px; z-index: 3; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.35); border-radius: 14px; padding: .55rem .7rem; }
+      #backArrow svg { display: block; width: 26px; height: 26px; }
+
+      /* --- Description overlay (PNG + bubble with X) --- */
+      #descOverlay { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(100% 100% at 50% 50%, rgba(0,0,0,.0), rgba(0,0,0,.55)); z-index: 4; }
+      #descInner { position: relative; max-width: 86vw; max-height: 86vh; }
+      #shellImg { display: block; width: min(86vw, 520px); height: auto; filter: drop-shadow(0 20px 40px rgba(0,0,0,.5)); }
+      .bubble { position: absolute; top: 6%; right: -4%; background: rgba(255,255,255,.95); color: #0a0b10; border-radius: 18px; padding: .9rem 1rem; width: min(70vw, 460px); max-width: 90vw; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+      .bubble .close { position: absolute; top: -12px; right: -12px; width: 36px; height: 36px; border-radius: 50%; border: 0; background: #111; color: #fff; font-weight: 700; line-height: 36px; }
+      .bubble h3 { margin: 0 0 .4rem 0; font-size: clamp(16px, 4vw, 22px); }
+      .bubble p { margin: 0; font-size: clamp(14px, 3.5vw, 18px); }
+
+      /* --- Interstitial (1s) --- */
+      #interstitial { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1000; background: #000; }
+
+      /* --- Loading overlay --- */
+      #loader { position: absolute; inset: 0; display: grid; place-items: center; background: #0a0b10; z-index: 2000; }
+      .spinner { width: 54px; height: 54px; border-radius: 50%; border: 4px solid rgba(255,255,255,.12); border-top-color: rgba(255,255,255,.85); animation: spin 1s linear infinite; }
+      @keyframes spin { to { transform: rotate(360deg); } }
+
+      /* --- Accessibility helpers --- */
+      .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+    </style>
+  </head>
+  <body>
+    <div id="orientation-guard">
+      <div>
+        <h1 style="margin:.2rem 0 1rem 0; font-weight:600;">Bitte hochkant halten 📱</h1>
+        <p style="opacity:.75;">Dieses Erlebnis ist für das iPad im Portrait‑Modus optimiert.</p>
+      </div>
+    </div>
+
+    <!-- Loading overlay (hidden once initial assets are ready) -->
+    <div id="loader"><div class="spinner" aria-label="Loading"></div></div>
+
+    <!-- Interstitial video overlay (1 second) -->
+    <video id="interstitial" class="hidden" playsinline muted preload="auto"></video>
+
+    <!-- START SCREEN: looping idle video with "Touch me" -->
+    <section id="start-screen" class="screen fade">
+      <video id="startVideo" playsinline muted loop preload="metadata">
+        <!-- Replace with your actual start idle video -->
+        <source src="assets/start_idle.mp4" type="video/mp4" />
+      </video>
+      <div class="touch-prompt pill tap" id="startTouch">TOUCH ME</div>
+    </section>
+
+    <!-- HUB SCREEN: 6 magical shells with labels -->
+    <section id="hub-screen" class="screen fade hidden" aria-label="Shell selection">
+      <div id="hub-bg" style="background-image:url('assets/shells-circle-bg.jpg');"></div>
+      <div class="hub-wrap">
+        <div class="hub-center">
+          <!-- Buttons are injected by JS from SHELLS config -->
+        </div>
+      </div>
+    </section>
+
+    <!-- ANIMATION SCREEN: plays the selected shell animation -->
+    <section id="animation-screen" class="screen fade hidden">
+      <button id="backArrow" class="tap" aria-label="Zurück">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <polyline points="15 18 9 12 15 6"></polyline>
+        </svg>
+      </button>
+      <video id="animVideo" playsinline muted loop preload="metadata"></video>
+      <button class="sr-only" id="showDesc">Beschreibung anzeigen</button>
+    </section>
+
+    <!-- DESCRIPTION OVERLAY: PNG of shell + emotion text, closable bubble with X -->
+    <div id="descOverlay" class="hidden fade transparent" aria-modal="true" role="dialog">
+      <div id="descInner">
+        <img id="shellImg" alt="Shell" src="" />
+        <div class="bubble elev-1">
+          <button class="close tap" id="closeDesc" aria-label="Schließen">×</button>
+          <h3 id="descTitle">Emotion</h3>
+          <p id="descText">Beschreibungstext …</p>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /*
+       * ORAKEL – Single-file scaffold for GitHub Pages
+       * How to use:
+       * 1) Put your assets into /assets with the filenames used below (or adjust the config).
+       * 2) Commit this index.html to your GitHub repo root and enable GitHub Pages.
+       * 3) Open your site on the iPad in portrait. We'll integrate step-by-step.
+       */
+
+      const FIVE_MIN = 5 * 60 * 1000;
+
+      // Configure your 6 shells here (filenames are placeholders — replace with your actual files)
+      const SHELLS = [
+        {
+          key: 'anger',
+          title: 'the thorns of anger',
+          anim: 'assets/shell-anger.mp4',
+          image: 'assets/shell-anger.png',
+          emotionTitle: 'Anger',
+          emotionText: 'Die Dornen des Zorns: Wenn Grenzen berührt werden, fordert die Flamme Klarheit.'
+        },
+        {
+          key: 'dreams',
+          title: 'the mist of dreams',
+          anim: 'assets/shell-dreams.mp4',
+          image: 'assets/shell-dreams.png',
+          emotionTitle: 'Dreams',
+          emotionText: 'Der Nebel der Träume: Zwischen Ahnung und Aufbruch fällt ein leiser Entschluss.'
+        },
+        {
+          key: 'silence',
+          title: 'the song of silence',
+          anim: 'assets/shell-silence.mp4',
+          image: 'assets/shell-silence.png',
+          emotionTitle: 'Silence',
+          emotionText: 'Der Gesang der Stille: Ein Raum, der hört und heilt.'
+        },
+        {
+          key: 'tears',
+          title: 'the temple of tears',
+          anim: 'assets/shell-tears.mp4',
+          image: 'assets/shell-tears.png',
+          emotionTitle: 'Tears',
+          emotionText: 'Der Tempel der Tränen: Reinigung, Erinnerung, Rückkehr zu dir.'
+        },
+        {
+          key: 'vulnerability',
+          title: 'the power of vulnerability',
+          anim: 'assets/shell-vulnerability.mp4',
+          image: 'assets/shell-vulnerability.png',
+          emotionTitle: 'Vulnerability',
+          emotionText: 'Die Kraft der Verletzlichkeit: Weichheit als Stärke, Mut als Bewegung.'
+        },
+        {
+          key: 'failure',
+          title: 'the flow of failure',
+          anim: 'assets/shell-failure.mp4',
+          image: 'assets/shell-failure.png',
+          emotionTitle: 'Failure',
+          emotionText: 'Der Fluss des Scheiterns: Umlenken, lernen, wieder beginnen.'
+        }
+      ];
+
+      const startScreen = document.getElementById('start-screen');
+      const startVideo  = document.getElementById('startVideo');
+      const startTouch  = document.getElementById('startTouch');
+
+      const hubScreen   = document.getElementById('hub-screen');
+      const hubCenter   = hubScreen.querySelector('.hub-center');
+
+      const animScreen  = document.getElementById('animation-screen');
+      const animVideo   = document.getElementById('animVideo');
+      const backArrow   = document.getElementById('backArrow');
+
+      const descOverlay = document.getElementById('descOverlay');
+      const shellImg    = document.getElementById('shellImg');
+      const descTitle   = document.getElementById('descTitle');
+      const descText    = document.getElementById('descText');
+      const closeDesc   = document.getElementById('closeDesc');
+
+      const interstitial = document.getElementById('interstitial');
+
+      const loader = document.getElementById('loader');
+
+      let currentShell = null;
+      let idleTimer = null;
+      let isShowingInterstitial = false;
+
+      /* ------------------------------ INIT ------------------------------ */
+      function init() {
+        // Build hub buttons
+        hubCenter.innerHTML = '';
+        SHELLS.forEach((s, i) => {
+          const btn = document.createElement('button');
+          btn.className = `shell-label tap pos-${i}`;
+          btn.setAttribute('data-key', s.key);
+          btn.innerHTML = `<span class="pill">${s.title}</span>`;
+          btn.addEventListener('pointerdown', (e) => {
+            e.preventDefault();
+            playInterstitial(() => openShell(s.key));
+          });
+          hubCenter.appendChild(btn);
+        });
+
+        // Preload minimal assets
+        startVideo.addEventListener('loadeddata', () => hideLoaderSoon());
+        startVideo.addEventListener('error', hideLoaderSoon);
+        try { startVideo.play().catch(()=>{}); } catch (_) {}
+
+        // Global idle timer resets on all interactions
+        ['pointerdown','pointermove','keydown','touchstart'].forEach(evt => {
+          window.addEventListener(evt, resetIdleTimer, { passive: true });
+        });
+        resetIdleTimer();
+
+        // Start touch -> hub
+        startTouch.addEventListener('pointerdown', () => {
+          playInterstitial(showHub);
+        });
+
+        // Animation screen interactions
+        backArrow.addEventListener('pointerdown', () => playInterstitial(showHub));
+        animVideo.addEventListener('pointerdown', () => {
+          if (descOverlay.classList.contains('hidden')) {
+            playInterstitial(showDescription);
+          }
+        });
+        closeDesc.addEventListener('pointerdown', () => playInterstitial(hideDescription));
+
+        // Interstitial setup (provide your asset)
+        interstitial.src = 'assets/tap-interstitial.mp4'; // 1s video placeholder
+        interstitial.addEventListener('ended', () => {
+          if (!isShowingInterstitial) return;
+          finishInterstitial();
+        });
+
+        // Ensure videos are muted for reliable autoplay on iPad
+        [startVideo, animVideo, interstitial].forEach(v => { v.muted = true; v.playsInline = true; });
+
+        // Hide loader as fallback after 1.2s
+        setTimeout(hideLoaderSoon, 1200);
+      }
+
+      function hideLoaderSoon(){
+        loader.classList.add('hidden');
+      }
+
+      /* --------------------------- INTERSTITIAL -------------------------- */
+      function playInterstitial(nextAction){
+        if (isShowingInterstitial) return; // ignore while playing
+        isShowingInterstitial = true;
+        interstitial.classList.remove('hidden');
+        try { interstitial.currentTime = 0; interstitial.play().catch(()=>{}); } catch (_) {}
+        // Safety timeout in case the video has issues
+        interstitial._onDone = nextAction;
+        setTimeout(() => { if (isShowingInterstitial) finishInterstitial(); }, 1100);
+      }
+      function finishInterstitial(){
+        isShowingInterstitial = false;
+        interstitial.classList.add('hidden');
+        if (typeof interstitial._onDone === 'function') {
+          const cb = interstitial._onDone; interstitial._onDone = null; cb();
+        }
+      }
+
+      /* ----------------------------- SCREENS ----------------------------- */
+      function showStart(){
+        currentShell = null;
+        hide(descOverlay);
+        swapTo(startScreen);
+        try { startVideo.play().catch(()=>{}); } catch (_) {}
+      }
+
+      function showHub(){
+        hide(descOverlay);
+        swapTo(hubScreen);
+        try { startVideo.pause(); } catch(_){}
+      }
+
+      function openShell(key){
+        const s = SHELLS.find(x => x.key === key);
+        if (!s) return;
+        currentShell = s;
+        swapTo(animScreen);
+        // Load and play the animation (loop)
+        if (animVideo.src !== s.anim) {
+          animVideo.src = s.anim;
+          animVideo.load();
+        }
+        try { animVideo.play().catch(()=>{}); } catch (_) {}
+      }
+
+      function showDescription(){
+        if (!currentShell) return;
+        shellImg.src = currentShell.image;
+        descTitle.textContent = currentShell.emotionTitle;
+        descText.textContent = currentShell.emotionText;
+        descOverlay.classList.remove('hidden');
+        requestAnimationFrame(() => descOverlay.classList.remove('transparent'));
+      }
+
+      function hideDescription(){
+        descOverlay.classList.add('transparent');
+        setTimeout(() => descOverlay.classList.add('hidden'), 200);
+      }
+
+      function swapTo(el){
+        [startScreen, hubScreen, animScreen].forEach(s => {
+          if (s === el){ s.classList.remove('hidden'); s.classList.remove('transparent'); }
+          else { s.classList.add('hidden'); }
+        });
+      }
+
+      /* -------------------------- IDLE TIMEOUT --------------------------- */
+      function resetIdleTimer(){
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          // On inactivity, go to start idle video
+          playInterstitial(showStart);
+        }, FIVE_MIN);
+      }
+
+      /* ----------------------------- BOOT ------------------------------- */
+      document.addEventListener('DOMContentLoaded', init);
+    </script>
+  </body>
+</html>
